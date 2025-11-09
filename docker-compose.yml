@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Frontend service
+  frontend:
+    build:
+      context: ./motorbot-frontend
+      dockerfile: Dockerfile.dev
+    container_name: motorbot-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./motorbot-frontend/src:/app/src
+      - ./motorbot-frontend/public:/app/public
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_WS_BASE_URL=ws://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - motorbot-network
+
+  # Backend service
+  backend:
+    build:
+      context: ./motorbot-backend
+      dockerfile: Dockerfile.dev
+    container_name: motorbot-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./motorbot-backend/app:/app/app
+      - ./motorbot-backend/tests:/app/tests
+      - ./motorbot-backend/motorbot.db:/app/motorbot.db
+    environment:
+      - DATABASE_URL=sqlite:///./motorbot.db
+      - DEBUG=True
+      - LOG_LEVEL=INFO
+      - SERIAL_TIMEOUT=2
+    command: >
+      bash -c "python -m app.database.db init_db &&
+               uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    networks:
+      - motorbot-network
+    depends_on:
+      - db
+
+  # Database (optional - for SQLite we use file-based, but keeping for future postgres)
+  db:
+    image: alpine:latest
+    container_name: motorbot-db-init
+    volumes:
+      - ./motorbot-backend:/app
+    networks:
+      - motorbot-network
+
+networks:
+  motorbot-network:
+    driver: bridge
+
+volumes:
+  motorbot-db:
+    driver: local

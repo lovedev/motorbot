@@ -1,0 +1,49 @@
+{
+  "header": {
+    "online": "Online",
+    "offline": "Offline"
+  },
+  "common": {
+    "loading": "Loading...",
+    "online": "Online",
+    "selectMotor": "Select Motor",
+    "selectMotorToView": "Select a motor to view details"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "totalMotors": "Total Motors",
+    "calibrated": "Calibrated",
+    "functional": "Functional",
+    "motorsList": "Motors List",
+    "noMotors": "No motors available"
+  },
+  "setup": {
+    "title": "Setup MotorBus",
+    "discoverPorts": "Port Discovery",
+    "discoverPortsDescription": "Click the button below to discover all available USB ports and connected motors.",
+    "discoverButton": "Discover Ports",
+    "motorsList": "Motors",
+    "noMotors": "No motors found. Click 'Discover Ports' to find connected motors."
+  },
+  "calibration": {
+    "title": "Calibration",
+    "selectMotor": "Select Motor to Calibrate",
+    "calibrated": "Motor Calibrated",
+    "calibratedDescription": "This motor has been successfully calibrated and is ready for use.",
+    "notCalibrated": "Motor Not Calibrated",
+    "notCalibratedDescription": "This motor needs to be calibrated before use.",
+    "instructions": "Calibration Instructions",
+    "step1": "Ensure the motor is properly connected and powered",
+    "step2": "Click the calibrate button and wait for the process to complete",
+    "step3": "The motor will automatically move through its full range",
+    "startButton": "Start Calibration"
+  },
+  "lerobot": {
+    "title": "LeRobot Dashboard",
+    "realTimeTelemetry": "Real-Time Telemetry"
+  },
+  "learning": {
+    "title": "Learning Center",
+    "subtitle": "Learn how to use the Motor Control Dashboard"
+  }
+}

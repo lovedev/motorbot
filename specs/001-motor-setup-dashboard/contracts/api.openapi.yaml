@@ -1,0 +1,660 @@
+openapi: 3.0.0
+info:
+  title: Motor Setup and Monitoring Dashboard API
+  description: FastAPI backend for SO-ARM 101 robot motor configuration and monitoring
+  version: 1.0.0
+  contact:
+    name: LeRobot Installer Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: http://192.168.1.100:8000
+    description: Network access (replace IP as needed)
+
+paths:
+  /api/health:
+    get:
+      summary: Health check endpoint
+      tags:
+        - Health
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/ports:
+    get:
+      summary: List all detected serial ports
+      tags:
+        - Ports
+      responses:
+        '200':
+          description: List of available ports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Port'
+        '500':
+          description: Error enumerating ports
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/ports/{port_id}/test:
+    post:
+      summary: Test connectivity to a serial port
+      tags:
+        - Ports
+      parameters:
+        - name: port_id
+          in: path
+          required: true
+          description: Serial port identifier (e.g., "ttyACM0")
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Port test successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestPortResponse'
+        '400':
+          description: Invalid port identifier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '408':
+          description: Port test timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Port test failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/ports/{port_id}/label:
+    post:
+      summary: Save user-friendly label for a port
+      tags:
+        - Ports
+      parameters:
+        - name: port_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                  maxLength: 50
+                  description: User-friendly label (e.g., "Left Arm Port")
+              required:
+                - label
+      responses:
+        '200':
+          description: Label saved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Port'
+        '400':
+          description: Invalid label
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Port not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/motors/config:
+    get:
+      summary: Get current motor configuration
+      tags:
+        - Motors
+      responses:
+        '200':
+          description: Current configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MotorConfiguration'
+        '404':
+          description: No configuration exists yet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Save motor configuration
+      tags:
+        - Motors
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MotorConfigurationRequest'
+      responses:
+        '201':
+          description: Configuration saved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MotorConfiguration'
+        '400':
+          description: Invalid configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '409':
+          description: Duplicate motor IDs or ports
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/motors/{motor_id}/test:
+    post:
+      summary: Send test command to specific motor
+      tags:
+        - Motors
+      parameters:
+        - name: motor_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MotorTestCommand'
+      responses:
+        '200':
+          description: Command executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MotorTestResponse'
+        '400':
+          description: Invalid command or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Motor not found or offline
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '408':
+          description: Command execution timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/motors/emergency-stop:
+    post:
+      summary: Emergency stop all motors
+      tags:
+        - Motors
+      responses:
+        '200':
+          description: Emergency stop sent to all motors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  motors_stopped:
+                    type: integer
+                    description: Number of motors that received stop command
+        '500':
+          description: Emergency stop failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/logs:
+    get:
+      summary: Get operation logs with optional filtering
+      tags:
+        - Logs
+      parameters:
+        - name: motor_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by motor ID
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter logs after this date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter logs before this date
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [info, warning, error, critical]
+          description: Filter by severity level
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+          description: Maximum number of logs to return
+      responses:
+        '200':
+          description: List of operation logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OperationLog'
+
+  /api/logs/{motor_id}:
+    get:
+      summary: Get logs for specific motor
+      tags:
+        - Logs
+      parameters:
+        - name: motor_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+      responses:
+        '200':
+          description: Logs for specified motor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OperationLog'
+        '404':
+          description: Motor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Port:
+      type: object
+      properties:
+        port_id:
+          type: string
+          example: "ttyACM0"
+        device_name:
+          type: string
+          example: "/dev/ttyACM0"
+        device_id:
+          type: string
+          nullable: true
+          example: "10c4:ea60"
+        user_label:
+          type: string
+          nullable: true
+          example: "Left Arm Port"
+        is_active:
+          type: boolean
+          example: true
+        last_tested_at:
+          type: string
+          format: date-time
+          nullable: true
+        test_status:
+          type: string
+          enum: [success, failure, timeout]
+          nullable: true
+        connected_motor_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - port_id
+        - device_name
+        - is_active
+        - created_at
+        - updated_at
+
+    Motor:
+      type: object
+      properties:
+        motor_id:
+          type: integer
+          minimum: 1
+          maximum: 12
+        motor_type:
+          type: string
+          example: "STS3215"
+        port_id:
+          type: string
+        status:
+          type: string
+          enum: [unconfigured, configured, online, offline, error]
+        max_torque:
+          type: number
+        max_velocity:
+          type: number
+        min_position:
+          type: number
+        max_position:
+          type: number
+        current_position:
+          type: number
+          nullable: true
+        current_velocity:
+          type: number
+          nullable: true
+        current_torque:
+          type: number
+          nullable: true
+        current_temperature:
+          type: number
+          nullable: true
+        health_status:
+          type: string
+          enum: [healthy, warning, error]
+        error_condition:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    MotorConfiguration:
+      type: object
+      properties:
+        config_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        motors:
+          type: array
+          minItems: 12
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/Motor'
+        is_valid:
+          type: boolean
+        validation_errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        saved_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    MotorConfigurationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Configuration name
+        motors:
+          type: array
+          minItems: 12
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/MotorInput'
+      required:
+        - name
+        - motors
+
+    MotorInput:
+      type: object
+      properties:
+        motor_id:
+          type: integer
+          minimum: 1
+          maximum: 12
+        motor_type:
+          type: string
+        port_id:
+          type: string
+        max_torque:
+          type: number
+        max_velocity:
+          type: number
+        min_position:
+          type: number
+        max_position:
+          type: number
+      required:
+        - motor_id
+        - motor_type
+        - port_id
+        - max_torque
+        - max_velocity
+        - min_position
+        - max_position
+
+    TelemetryDataPoint:
+      type: object
+      properties:
+        telemetry_id:
+          type: string
+          format: uuid
+        motor_id:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        position:
+          type: number
+        velocity:
+          type: number
+        torque:
+          type: number
+        temperature:
+          type: number
+        status_flags:
+          type: object
+          properties:
+            is_online:
+              type: boolean
+            has_error:
+              type: boolean
+            is_moving:
+              type: boolean
+            temperature_warning:
+              type: boolean
+            position_limit_reached:
+              type: boolean
+            torque_limit_reached:
+              type: boolean
+
+    MotorTestCommand:
+      type: object
+      properties:
+        test_type:
+          type: string
+          enum: [position_move, velocity_check, torque_measure, temperature_check, emergency_stop_test]
+        parameters:
+          type: object
+          properties:
+            target_position:
+              type: number
+              nullable: true
+            target_velocity:
+              type: number
+              nullable: true
+            duration_ms:
+              type: integer
+              nullable: true
+      required:
+        - test_type
+
+    MotorTestResponse:
+      type: object
+      properties:
+        test_id:
+          type: string
+          format: uuid
+        success:
+          type: boolean
+        start_state:
+          $ref: '#/components/schemas/TelemetryDataPoint'
+        end_state:
+          $ref: '#/components/schemas/TelemetryDataPoint'
+        duration_ms:
+          type: integer
+        passed_criteria:
+          type: array
+          items:
+            type: string
+        failed_criteria:
+          type: array
+          items:
+            type: string
+        error:
+          type: string
+          nullable: true
+
+    TestPortResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        port_id:
+          type: string
+        device_id:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+
+    OperationLog:
+      type: object
+      properties:
+        log_id:
+          type: string
+          format: uuid
+        motor_id:
+          type: integer
+        operation_type:
+          type: string
+          enum: [test_command, error, state_change, configuration, emergency_stop]
+        timestamp:
+          type: string
+          format: date-time
+        details:
+          type: object
+          properties:
+            command:
+              type: string
+              nullable: true
+            success:
+              type: boolean
+            error_message:
+              type: string
+              nullable: true
+            duration_ms:
+              type: integer
+              nullable: true
+        severity:
+          type: string
+          enum: [info, warning, error, critical]
+        category:
+          type: string
+          nullable: true
+
+    ValidationError:
+      type: object
+      properties:
+        motor_id:
+          type: integer
+        field:
+          type: string
+        message:
+          type: string
+        severity:
+          type: string
+          enum: [error, warning]
+
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Error message
+        status_code:
+          type: integer
+          description: HTTP status code
+        timestamp:
+          type: string
+          format: date-time
